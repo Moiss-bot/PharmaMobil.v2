@@ -30,15 +30,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
 import pe.edu.upeu.pharmamobil.domain.model.Producto
 import pe.edu.upeu.pharmamobil.platform.formatearSoles
+import pe.edu.upeu.pharmamobil.presentation.sesion.SesionViewModel
 
 @Composable
 fun ProductoScreen(
     viewModel: ProductosViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sesionViewModel: SesionViewModel = koinViewModel()
 ) {
     val uiState by viewModel.estado.collectAsStateWithLifecycle()
+    val sesionState by sesionViewModel.estado.collectAsStateWithLifecycle()
+
+    // Comprobar si el rol actual tiene permiso para crear/modificar productos[cite: 11, 24]
+    val puedeEscribir = sesionState.sesion?.puede("CATALOGO_ESCRIBIR") == true
 
     Column(
         modifier = modifier
@@ -51,15 +58,17 @@ fun ProductoScreen(
             style = MaterialTheme.typography.titleLarge
         )
 
-        // Formulario
-        FormularioSection(
-            formulario = uiState.formulario,
-            operacion = uiState.operacion,
-            onNombreChange = viewModel::onNombreChange,
-            onPrecioChange = viewModel::onPrecioChange,
-            onStockChange = viewModel::onStockChange,
-            onGuardar = viewModel::guardar
-        )
+        // Muestra el formulario únicamente si el usuario tiene permiso CATALOGO_ESCRIBIR[cite: 11, 24]
+        if (puedeEscribir) {
+            FormularioSection(
+                formulario = uiState.formulario,
+                operacion = uiState.operacion,
+                onNombreChange = viewModel::onNombreChange,
+                onPrecioChange = viewModel::onPrecioChange,
+                onStockChange = viewModel::onStockChange,
+                onGuardar = viewModel::guardar
+            )
+        }
 
         uiState.mensajeExito?.let { msj ->
             Text(
@@ -96,6 +105,7 @@ fun ProductoScreen(
                             ProductoItem(
                                 producto = producto,
                                 operacion = uiState.operacion,
+                                puedeEscribir = puedeEscribir,
                                 onEdit = { viewModel.seleccionarParaEditar(producto) },
                                 onDelete = { viewModel.eliminar(producto.id) },
                                 onShare = { viewModel.compartir(producto) }
@@ -184,6 +194,7 @@ private fun FormularioSection(
 private fun ProductoItem(
     producto: Producto,
     operacion: ProductoUiState.Operacion,
+    puedeEscribir: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit
@@ -202,15 +213,18 @@ private fun ProductoItem(
                 Icon(Icons.Default.Share, contentDescription = "Compartir")
             }
 
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar")
-            }
+            // Ocultar acciones de edicion y eliminacion si no posee el permiso[cite: 11, 24]
+            if (puedeEscribir) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Editar")
+                }
 
-            val enEliminacion = operacion is ProductoUiState.Operacion.EnCurso &&
-                    operacion.tipo == ProductoUiState.Tipo.Eliminar
+                val enEliminacion = operacion is ProductoUiState.Operacion.EnCurso &&
+                        operacion.tipo == ProductoUiState.Tipo.Eliminar
 
-            IconButton(onClick = onDelete, enabled = !enEliminacion) {
-                Icon(Icons.Default.Delete, contentDescription = "Eliminar")
+                IconButton(onClick = onDelete, enabled = !enEliminacion) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar")
+                }
             }
         }
     }

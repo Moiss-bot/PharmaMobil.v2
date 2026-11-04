@@ -23,46 +23,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
 import pe.edu.upeu.pharmamobil.navigation.Screen
-
-/** Cada acceso rapido de la portada lleva a uno de los modulos de la app. */
-private data class Opcion(
-    val screen: Screen,
-    val icono: ImageVector,
-    val titulo: String,
-    val descripcion: String
-)
-
-private val OPCIONES = listOf(
-    Opcion(
-        screen = Screen.Productos,
-        icono = Icons.Default.Medication,
-        titulo = "Registrar productos",
-        descripcion = "Da de alta medicamentos con su precio y su stock."
-    ),
-    Opcion(
-        screen = Screen.Clientes,
-        icono = Icons.Default.Person,
-        titulo = "Registrar clientes",
-        descripcion = "Guarda los datos de contacto para la boleta."
-    ),
-    Opcion(
-        screen = Screen.Pedidos,
-        icono = Icons.Default.ShoppingCart,
-        titulo = "Revisar pedidos",
-        descripcion = "Disponible en una próxima sesión del curso."
-    )
-)
+import pe.edu.upeu.pharmamobil.presentation.sesion.SesionViewModel
 
 @Composable
 fun InicioScreen(
     onNavegar: (Screen) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sesionViewModel: SesionViewModel = koinViewModel()
 ) {
+    val sesionState by sesionViewModel.estado.collectAsStateWithLifecycle()
+    val sesion = sesionState.sesion
 
     Column(
         modifier = modifier
@@ -79,24 +57,39 @@ fun InicioScreen(
             style = MaterialTheme.typography.titleMedium
         )
 
-        OPCIONES.forEach { opcion ->
-
+        // Módulo Productos: visible si el rol tiene permiso CATALOGO_LEER
+        if (sesion?.puede("CATALOGO_LEER") == true) {
+            val puedeEscribir = sesion.puede("CATALOGO_ESCRIBIR")
             AccesoRapido(
-                icono = opcion.icono,
-                titulo = opcion.titulo,
-                descripcion = opcion.descripcion,
-                onClick = {
-                    onNavegar(opcion.screen)
-                }
+                icono = Icons.Default.Medication,
+                titulo = if (puedeEscribir) "Registrar productos" else "Ver catálogo de productos",
+                descripcion = if (puedeEscribir) "Da de alta medicamentos con su precio y su stock." else "Consulta la lista de productos disponibles.",
+                onClick = { onNavegar(Screen.Productos) }
             )
         }
+
+        // Módulo Clientes: visible únicamente si el rol tiene permiso CLIENTES_LEER
+        if (sesion?.puede("CLIENTES_LEER") == true) {
+            AccesoRapido(
+                icono = Icons.Default.Person,
+                titulo = "Registrar clientes",
+                descripcion = "Guarda los datos de contacto para la boleta.",
+                onClick = { onNavegar(Screen.Clientes) }
+            )
+        }
+
+        // Módulo Pedidos
+        AccesoRapido(
+            icono = Icons.Default.ShoppingCart,
+            titulo = "Revisar pedidos",
+            descripcion = "Disponible en una próxima sesión del curso.",
+            onClick = { onNavegar(Screen.Pedidos) }
+        )
     }
 }
 
-
 @Composable
 private fun Portada() {
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -104,12 +97,10 @@ private fun Portada() {
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         )
     ) {
-
         Column(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-
             Icon(
                 imageVector = Icons.Default.LocalPharmacy,
                 contentDescription = null,
@@ -129,7 +120,6 @@ private fun Portada() {
     }
 }
 
-
 @Composable
 private fun AccesoRapido(
     icono: ImageVector,
@@ -137,24 +127,20 @@ private fun AccesoRapido(
     descripcion: String,
     onClick: () -> Unit
 ) {
-
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
-
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
-
                 Icon(
                     imageVector = icono,
                     contentDescription = null,
@@ -168,7 +154,6 @@ private fun AccesoRapido(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-
                 Text(
                     text = titulo,
                     style = MaterialTheme.typography.titleSmall

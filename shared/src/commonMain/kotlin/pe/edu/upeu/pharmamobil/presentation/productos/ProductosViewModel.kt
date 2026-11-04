@@ -2,6 +2,8 @@ package pe.edu.upeu.pharmamobil.presentation.productos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,7 @@ class ProductosViewModel(
     fun compartir(producto: Producto) {
         compartidor.compartir(producto.comoTextoParaCompartir())
     }
+
     fun cargarProductos() = viewModelScope.launch {
         _estado.update { it.copy(fase = ProductoUiState.Fase.Cargando) }
         listarProductosUseCase()
@@ -157,6 +160,12 @@ class ProductosViewModel(
     }
 
     private fun mensajeDe(fallo: Throwable): String {
+        if (fallo is ClientRequestException) {
+            when (fallo.response.status) {
+                HttpStatusCode.Forbidden -> return "No tienes permisos suficientes para realizar esta acción (403 Forbidden)."
+                HttpStatusCode.BadRequest -> return "Datos de solicitud inválidos (400 Bad Request)."
+            }
+        }
         val error = (fallo as? ErrorApiException)?.error
         return when (error) {
             is ErrorApi.SinConexion -> "Sin conexión a internet"

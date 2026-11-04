@@ -132,27 +132,35 @@ fun App(
                         )
 
                         DESTINOS.forEach { destino ->
-                            NavigationDrawerItem(
-                                label = {
-                                    Text(destino.titulo)
-                                },
-                                selected = pantallaActual == destino.screen,
-                                onClick = {
-                                    pantallaActual = destino.screen
-                                    scope.launch {
-                                        drawerState.close()
-                                    }
-                                },
-                                icon = {
-                                    Icon(
-                                        imageVector = destino.icono,
-                                        contentDescription = null
+                            // Filtrar en el menu lateral segun permisos del rol[cite: 24]
+                            val tienePermiso = when (destino.screen) {
+                                Screen.Clientes -> sesionState.sesion?.puede("CLIENTES_LEER") == true
+                                else -> true
+                            }
+
+                            if (tienePermiso) {
+                                NavigationDrawerItem(
+                                    label = {
+                                        Text(destino.titulo)
+                                    },
+                                    selected = pantallaActual == destino.screen,
+                                    onClick = {
+                                        pantallaActual = destino.screen
+                                        scope.launch {
+                                            drawerState.close()
+                                        }
+                                    },
+                                    icon = {
+                                        Icon(
+                                            imageVector = destino.icono,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier.padding(
+                                        NavigationDrawerItemDefaults.ItemPadding
                                     )
-                                },
-                                modifier = Modifier.padding(
-                                    NavigationDrawerItemDefaults.ItemPadding
                                 )
-                            )
+                            }
                         }
 
                         Spacer(

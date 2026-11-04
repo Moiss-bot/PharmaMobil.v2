@@ -2,6 +2,8 @@ package pe.edu.upeu.pharmamobil.presentation.cliente
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,7 +12,6 @@ import kotlinx.coroutines.launch
 import pe.edu.upeu.pharmamobil.domain.usecase.ClienteInvalidoException
 import pe.edu.upeu.pharmamobil.domain.usecase.ListarClientesUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarClienteUseCase
-
 
 class ClienteViewModel(
     private val registrarCliente: RegistrarClienteUseCase,
@@ -25,9 +26,7 @@ class ClienteViewModel(
     }
 
     fun cargarClientes() {
-
         viewModelScope.launch {
-
             _uiState.update {
                 it.copy(fase = ClienteUiState.Fase.Cargando)
             }
@@ -41,9 +40,13 @@ class ClienteViewModel(
                     }
                 },
                 onFailure = { fallo ->
-                    ClienteUiState.Fase.Error(
-                        fallo.message ?: "No se pudo cargar la cartera de clientes"
-                    )
+                    val mensaje = when {
+                        fallo is ClientRequestException && fallo.response.status == HttpStatusCode.Forbidden ->
+                            "No tienes permiso para consultar la cartera de clientes (403 Forbidden)."
+                        else ->
+                            fallo.message ?: "No se pudo cargar la cartera de clientes"
+                    }
+                    ClienteUiState.Fase.Error(mensaje)
                 }
             )
 
@@ -81,11 +84,9 @@ class ClienteViewModel(
     }
 
     fun registrar() {
-
         if (_uiState.value.registrando) return
 
         viewModelScope.launch {
-
             _uiState.update {
                 it.copy(registrando = true, mensajeExito = null)
             }
@@ -108,9 +109,8 @@ class ClienteViewModel(
                     cargarClientes()
                 },
                 onFailure = { fallo ->
-                    when (fallo) {
-
-                        is ClienteInvalidoException -> _uiState.update {
+                    when {
+                        fallo is ClienteInvalidoException -> _uiState.update {
                             it.copy(
                                 registrando = false,
                                 formulario = it.formulario.copy(
@@ -118,6 +118,13 @@ class ClienteViewModel(
                                     correoError = fallo.errores.correo,
                                     telefonoError = fallo.errores.telefono
                                 )
+                            )
+                        }
+
+                        fallo is ClientRequestException && fallo.response.status == HttpStatusCode.Forbidden -> _uiState.update {
+                            it.copy(
+                                registrando = false,
+                                fase = ClienteUiState.Fase.Error("No tienes permiso para registrar clientes (403 Forbidden).")
                             )
                         }
 
