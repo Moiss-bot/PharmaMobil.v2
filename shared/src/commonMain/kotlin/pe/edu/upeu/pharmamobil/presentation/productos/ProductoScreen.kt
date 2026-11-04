@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -15,6 +14,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.edu.upeu.pharmamobil.domain.model.Producto
+import pe.edu.upeu.pharmamobil.platform.formatearSoles
 
 @Composable
 fun ProductoScreen(
@@ -68,7 +69,7 @@ fun ProductoScreen(
             )
         }
 
-        // Evaluación exhaustiva de Fase (Punto de Control 6)
+        // Evaluación exhaustiva de Fase
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,7 +97,8 @@ fun ProductoScreen(
                                 producto = producto,
                                 operacion = uiState.operacion,
                                 onEdit = { viewModel.seleccionarParaEditar(producto) },
-                                onDelete = { viewModel.eliminar(producto.id) }
+                                onDelete = { viewModel.eliminar(producto.id) },
+                                onShare = { viewModel.compartir(producto) }
                             )
                         }
                     }
@@ -183,7 +185,8 @@ private fun ProductoItem(
     producto: Producto,
     operacion: ProductoUiState.Operacion,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -192,7 +195,11 @@ private fun ProductoItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
-                Text("S/ ${producto.precio}  ·  Stock: ${producto.stock} u.")
+                Text("${formatearSoles(producto.precio)}  ·  Stock: ${producto.stock} u.")
+            }
+
+            IconButton(onClick = onShare) {
+                Icon(Icons.Default.Share, contentDescription = "Compartir")
             }
 
             IconButton(onClick = onEdit) {

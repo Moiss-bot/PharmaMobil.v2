@@ -36,7 +36,7 @@ val domainModule = module {
 }
 
 val presentationModule = module {
-    factory { ProductosViewModel(get(), get(), get(), get()) }
+    factory { ProductosViewModel(get(), get(), get(), get(), get()) }
 }
 
 fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
