@@ -10,16 +10,19 @@ import kotlinx.coroutines.launch
 import pe.edu.upeu.pharmamobil.domain.error.ErrorApi
 import pe.edu.upeu.pharmamobil.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobil.domain.model.Producto
+import pe.edu.upeu.pharmamobil.domain.platform.Compartidor
 import pe.edu.upeu.pharmamobil.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.EliminarProductoUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.ListarProductosUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarProductoUseCase
+import pe.edu.upeu.pharmamobil.domain.usecase.comoTextoParaCompartir
 
 class ProductosViewModel(
     private val listarProductosUseCase: ListarProductosUseCase,
     private val registrarProductoUseCase: RegistrarProductoUseCase,
     private val actualizarProductoUseCase: ActualizarProductoUseCase,
-    private val eliminarProductoUseCase: EliminarProductoUseCase
+    private val eliminarProductoUseCase: EliminarProductoUseCase,
+    private val compartidor: Compartidor
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow(ProductoUiState())
@@ -29,6 +32,9 @@ class ProductosViewModel(
         cargarProductos()
     }
 
+    fun compartir(producto: Producto) {
+        compartidor.compartir(producto.comoTextoParaCompartir())
+    }
     fun cargarProductos() = viewModelScope.launch {
         _estado.update { it.copy(fase = ProductoUiState.Fase.Cargando) }
         listarProductosUseCase()

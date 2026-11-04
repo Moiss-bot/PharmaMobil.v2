@@ -1,32 +1,18 @@
 package pe.edu.upeu.pharmamobil.presentation.productos
 
-import kotlin.math.roundToLong
 import pe.edu.upeu.pharmamobil.domain.model.Producto
-
+import pe.edu.upeu.pharmamobil.platform.formatearSoles
 
 data class ProductoUi(
     val id: Long,
     val nombre: String,
-    val precio: String,
-    val stock: String,
-    val requiereReposicion: Boolean
+    val precio: String, // Formateado en soles
+    val stock: Int
 )
 
-fun Producto.aUi(): ProductoUi = ProductoUi(
+fun Producto.toUi(): ProductoUi = ProductoUi(
     id = id,
     nombre = nombre,
-    precio = precio.enSoles(),
-    stock = "$stock u.",
-    requiereReposicion = requiereReposicion
+    precio = formatearSoles(precio),
+    stock = stock
 )
-
-/** Kotlin comun no trae String.format, asi que armamos los dos decimales a mano. */
-private fun Double.enSoles(): String {
-
-    val centavos = (this * 100).roundToLong()
-
-    val enteros = centavos / 100
-    val decimales = (centavos % 100).toString().padStart(2, '0')
-
-    return "S/ $enteros.$decimales"
-}

@@ -80,7 +80,8 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            // Motor falso: prueba el cliente sin red (200, 404, timeout, sin conexion)
+            // Agrega koin-test para KoinTest y get()
+            implementation("io.insert-koin:koin-test:3.5.6")
             implementation(libs.ktor.client.mock)
         }
     }
@@ -89,8 +90,11 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+
+// Configuración global para ignorar excepciones de Android Log en unit tests
 tasks.withType<Test>().configureEach {
     testLogging {
         showStandardStreams = true
     }
+    systemProperty("android.util.log.mocked", "true")
 }

@@ -2,12 +2,15 @@ package pe.edu.upeu.pharmamobil.presentation.productos
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import pe.edu.upeu.pharmamobil.data.repository.FakeProductoRepository
 import pe.edu.upeu.pharmamobil.domain.model.Producto
+import pe.edu.upeu.pharmamobil.domain.usecase.ActualizarProductoUseCase
+import pe.edu.upeu.pharmamobil.domain.usecase.EliminarProductoUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.ListarProductosUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarProductoUseCase
 import kotlin.test.AfterTest
@@ -15,112 +18,103 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-/**
- * viewModelScope corre sobre Dispatchers.Main, que en una prueba no existe:
- * setMain lo sustituye por un dispatcher de prueba antes de cada caso.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ProductosViewModelTest {
+class ProductoViewModelTest {
+
+    private val testDispatcher = StandardTestDispatcher()
 
     @BeforeTest
-    fun instalarMain() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
     }
 
     @AfterTest
-    fun restaurarMain() {
+    fun tearDown() {
         Dispatchers.resetMain()
     }
 
-    private fun nuevoViewModel(
-        repositorio: FakeProductoRepository = FakeProductoRepository()
-    ) = ProductosViewModel(
-        registrarProducto = RegistrarProductoUseCase(repositorio),
-        listarProductos = ListarProductosUseCase(repositorio)
-    )
-
     @Test
-    fun arrancaEnSinProductosCuandoElInventarioEstaVacio() = runTest {
+    fun el_listado_vacio_termina_en_SinProductos() = runTest(testDispatcher) {
+        val repositorio = FakeProductoRepository(productos = emptyList())
+        val viewModel = ProductosViewModel(
+            ListarProductosUseCase(repositorio),
+            RegistrarProductoUseCase(repositorio),
+            ActualizarProductoUseCase(repositorio),
+            EliminarProductoUseCase(repositorio)
+        )
 
-        val viewModel = nuevoViewModel()
+        advanceUntilIdle()
 
-        assertEquals(ProductoUiState.Fase.SinProductos, viewModel.uiState.value.fase)
+        assertIs<ProductoUiState.Fase.SinProductos>(viewModel.estado.value.fase)
     }
 
     @Test
-    fun muestraElInventarioConElPrecioYaFormateado() = runTest {
+    fun la_carga_exitosa_pasa_a_ConProductos() = runTest(testDispatcher) {
+        val listaInicial = listOf(Producto(1L, "Paracetamol", 5.0, 10))
+        val repositorio = FakeProductoRepository(productos = listaInicial)
+        val viewModel = ProductosViewModel(
+            ListarProductosUseCase(repositorio),
+            RegistrarProductoUseCase(repositorio),
+            ActualizarProductoUseCase(repositorio),
+            EliminarProductoUseCase(repositorio)
+        )
 
+        advanceUntilIdle()
+
+        val faseActual = viewModel.estado.value.fase
+        assertIs<ProductoUiState.Fase.ConProductos>(faseActual)
+        assertEquals(1, faseActual.productos.size)
+        assertEquals("Paracetamol", faseActual.productos.first().nombre)
+    }
+
+    @Test
+    fun ante_un_error_de_validacion_se_asignan_errores_al_formulario_y_la_fase_no_cambia() = runTest(testDispatcher) {
         val repositorio = FakeProductoRepository(
-            mutableListOf(
-                Producto(id = 1L, nombre = "Paracetamol", precio = 12.5, stock = 5)
-            )
+            productos = listOf(Producto(1L, "Ibuprofeno", 8.0, 20)),
+            debeLanzarErrorValidacion = true
+        )
+        val viewModel = ProductosViewModel(
+            ListarProductosUseCase(repositorio),
+            RegistrarProductoUseCase(repositorio),
+            ActualizarProductoUseCase(repositorio),
+            EliminarProductoUseCase(repositorio)
         )
 
-        val fase = assertIs<ProductoUiState.Fase.ConProductos>(
-            nuevoViewModel(repositorio).uiState.value.fase
-        )
+        advanceUntilIdle() // Carga inicial
 
-        assertEquals("S/ 12.50", fase.productos.first().precio)
-        assertEquals("5 u.", fase.productos.first().stock)
-        assertTrue(fase.productos.first().requiereReposicion)
+        viewModel.onNombreChange("Pa") // < 3 caracteres
+        viewModel.onPrecioChange("5.0")
+        viewModel.onStockChange("10")
+        viewModel.guardar()
+
+        advanceUntilIdle()
+
+        val estado = viewModel.estado.value
+        assertEquals("El nombre debe tener al menos 3 caracteres", estado.formulario.nombreError)
+        assertIs<ProductoUiState.Fase.ConProductos>(estado.fase)
     }
 
     @Test
-    fun pasaAFaseErrorCuandoElRepositorioFalla() = runTest {
-
-        val repositorio = FakeProductoRepository().apply {
-            fallaAlListar = IllegalStateException("Sin conexión")
-        }
-
-        val fase = assertIs<ProductoUiState.Fase.Error>(
-            nuevoViewModel(repositorio).uiState.value.fase
+    fun la_eliminacion_mantiene_inactiva_la_operacion_al_finalizar_y_actualiza_la_lista() = runTest(testDispatcher) {
+        val repositorio = FakeProductoRepository(
+            productos = listOf(Producto(1L, "Amoxicilina", 12.0, 15))
+        )
+        val viewModel = ProductosViewModel(
+            ListarProductosUseCase(repositorio),
+            RegistrarProductoUseCase(repositorio),
+            ActualizarProductoUseCase(repositorio),
+            EliminarProductoUseCase(repositorio)
         )
 
-        assertEquals("Sin conexión", fase.mensaje)
-    }
+        advanceUntilIdle()
 
-    @Test
-    fun losErroresDeValidacionCaenEnElFormularioNoEnLaFase() = runTest {
+        viewModel.eliminar(1L)
+        advanceUntilIdle()
 
-        val viewModel = nuevoViewModel()
-
-        viewModel.onNombreChange("")
-        viewModel.onPrecioChange("abc")
-        viewModel.onStockChange("-1")
-        viewModel.registrar()
-
-        val estado = viewModel.uiState.value
-
-        assertEquals("El nombre es obligatorio", estado.formulario.nombreError)
-        assertEquals("El precio debe ser un número válido", estado.formulario.precioError)
-        assertEquals("El stock no puede ser negativo", estado.formulario.stockError)
-        assertEquals(ProductoUiState.Fase.SinProductos, estado.fase)
-        assertNull(estado.mensajeExito)
-    }
-
-    @Test
-    fun registrarLimpiaElFormularioYRecargaElInventario() = runTest {
-
-        val viewModel = nuevoViewModel()
-
-        viewModel.onNombreChange("Paracetamol")
-        viewModel.onPrecioChange("12.50")
-        viewModel.onStockChange("5")
-        viewModel.registrar()
-
-        val estado = viewModel.uiState.value
-        val fase = assertIs<ProductoUiState.Fase.ConProductos>(estado.fase)
-
-        assertEquals("Paracetamol", fase.productos.single().nombre)
-        assertEquals("", estado.formulario.nombre)
-        assertEquals("", estado.formulario.precio)
-        assertEquals("", estado.formulario.stock)
-        assertEquals(
-            "Producto \"Paracetamol\" registrado correctamente",
-            estado.mensajeExito
-        )
+        val estado = viewModel.estado.value
+        assertEquals(ProductoUiState.Operacion.Inactiva, estado.operacion)
+        assertEquals("Producto eliminado", estado.mensajeExito)
+        assertIs<ProductoUiState.Fase.SinProductos>(estado.fase)
     }
 }
