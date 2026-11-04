@@ -46,6 +46,8 @@ kotlin {
             implementation(libs.compose.uiTooling)
             // api: MainApplication (androidApp) usa androidContext() al arrancar Koin.
             api(libs.koin.android)
+            // Sesion 10: Cifrado para Android (EncryptedSharedPreferences)
+            implementation(libs.androidx.security.crypto)
             // Sesion 7: motor de red de Android
             implementation(libs.ktor.client.okhttp)
             // OkHttp 5.5.0 (transitiva de Ktor) pide compileSdk 37; se fija 5.4.0 (ver libs.versions.toml).
@@ -71,8 +73,9 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            // Sesion 7: Ktor Client (nucleo + plugins) y kotlinx.serialization
+            // Sesion 7 y 10: Ktor Client (nucleo + auth plugin) y kotlinx.serialization
             implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.auth)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
