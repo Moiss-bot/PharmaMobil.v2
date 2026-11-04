@@ -10,16 +10,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,7 +37,7 @@ fun ProductoScreen(
     viewModel: ProductosViewModel,
     modifier: Modifier = Modifier
 ) {
-    val estado by viewModel.estado.collectAsStateWithLifecycle()
+    val uiState by viewModel.estado.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -43,66 +46,70 @@ fun ProductoScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Inventario PharmaSoft",
+            text = "CRUD Productos PharmaSoft",
             style = MaterialTheme.typography.titleLarge
         )
 
+        // Formulario
+        FormularioSection(
+            formulario = uiState.formulario,
+            operacion = uiState.operacion,
+            onNombreChange = viewModel::onNombreChange,
+            onPrecioChange = viewModel::onPrecioChange,
+            onStockChange = viewModel::onStockChange,
+            onGuardar = viewModel::guardar
+        )
+
+        uiState.mensajeExito?.let { msj ->
+            Text(
+                text = msj,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        // Evaluación exhaustiva de Fase (Punto de Control 6)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            when (val actual = estado) {
-                is ProductosUiState.Loading -> {
+            when (val fase = uiState.fase) {
+                ProductoUiState.Fase.Cargando -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+
+                ProductoUiState.Fase.SinProductos -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = "Cargando productos de la API…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Icon(Icons.Default.Inventory2, contentDescription = null)
+                        Text("Aún no hay productos registrados")
                     }
                 }
 
-                is ProductosUiState.Success -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            items = actual.productos,
-                            key = { it.id }
-                        ) { producto ->
-                            ProductoItem(producto)
+                is ProductoUiState.Fase.ConProductos -> {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(fase.productos, key = { it.id }) { producto ->
+                            ProductoItem(
+                                producto = producto,
+                                operacion = uiState.operacion,
+                                onEdit = { viewModel.seleccionarParaEditar(producto) },
+                                onDelete = { viewModel.eliminar(producto.id) }
+                            )
                         }
                     }
                 }
 
-                is ProductosUiState.Error -> {
+                is ProductoUiState.Fase.Error -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Text(
-                            text = "Error de conexión",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            text = actual.mensaje,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        FilledTonalButton(onClick = { viewModel.cargar() }) {
+                        Icon(Icons.Default.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Text(fase.mensaje, color = MaterialTheme.colorScheme.error)
+                        FilledTonalButton(onClick = viewModel::cargarProductos) {
                             Text("Reintentar")
                         }
                     }
@@ -113,60 +120,90 @@ fun ProductoScreen(
 }
 
 @Composable
-private fun ProductoItem(
-    producto: Producto
+private fun FormularioSection(
+    formulario: FormularioProducto,
+    operacion: ProductoUiState.Operacion,
+    onNombreChange: (String) -> Unit,
+    onPrecioChange: (String) -> Unit,
+    onStockChange: (String) -> Unit,
+    onGuardar: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(if (formulario.id == null) "Nuevo Producto" else "Editar Producto #${formulario.id}")
+
+            OutlinedTextField(
+                value = formulario.nombre,
+                onValueChange = onNombreChange,
+                label = { Text("Nombre") },
+                isError = formulario.nombreError != null,
+                supportingText = { formulario.nombreError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = formulario.precio,
+                    onValueChange = onPrecioChange,
+                    label = { Text("Precio") },
+                    isError = formulario.precioError != null,
+                    supportingText = { formulario.precioError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    modifier = Modifier.weight(1f)
+                )
+
+                OutlinedTextField(
+                    value = formulario.stock,
+                    onValueChange = onStockChange,
+                    label = { Text("Stock") },
+                    isError = formulario.stockError != null,
+                    supportingText = { formulario.stockError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            val enGuardado = operacion is ProductoUiState.Operacion.EnCurso &&
+                    (operacion.tipo == ProductoUiState.Tipo.Crear || operacion.tipo == ProductoUiState.Tipo.Actualizar)
+
+            Button(
+                onClick = onGuardar,
+                enabled = !enGuardado,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (enGuardado) "Guardando…" else "Guardar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductoItem(
+    producto: Producto,
+    operacion: ProductoUiState.Operacion,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Medication,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .size(20.dp)
-                )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
+                Text("S/ ${producto.precio}  ·  Stock: ${producto.stock} u.")
             }
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = producto.nombre,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = "Stock: ${producto.stock} u. · S/ ${producto.precio}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Editar")
             }
 
-            if (producto.requiereReposicion) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                ) {
-                    Text(
-                        text = "Reponer",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(
-                            horizontal = 8.dp,
-                            vertical = 4.dp
-                        )
-                    )
-                }
+            val enEliminacion = operacion is ProductoUiState.Operacion.EnCurso &&
+                    operacion.tipo == ProductoUiState.Tipo.Eliminar
+
+            IconButton(onClick = onDelete, enabled = !enEliminacion) {
+                Icon(Icons.Default.Delete, contentDescription = "Eliminar")
             }
         }
     }

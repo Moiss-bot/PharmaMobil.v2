@@ -4,10 +4,9 @@ import pe.edu.upeu.pharmamobil.domain.model.Producto
 import pe.edu.upeu.pharmamobil.domain.repository.ProductoRepository
 
 class ListarProductosUseCase(
-    private val productoRepository: ProductoRepository
+    private val repository: ProductoRepository
 ) {
-
-    suspend operator fun invoke(): Result<List<Producto>> = resultadoDe {
-        productoRepository.listar()
+    suspend operator fun invoke(): Result<List<Producto>> = runCatching {
+        repository.listar()
     }
 }
