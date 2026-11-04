@@ -38,6 +38,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,6 +51,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 import pe.edu.upeu.pharmamobil.navigation.Screen
+import pe.edu.upeu.pharmamobil.platform.InfoDispositivo
 import pe.edu.upeu.pharmamobil.presentation.cliente.ClienteScreen
 import pe.edu.upeu.pharmamobil.presentation.components.EstadoVacio
 import pe.edu.upeu.pharmamobil.presentation.inicio.InicioScreen
@@ -223,6 +225,8 @@ fun App(pantallaInicial: Screen = Screen.Inicio) {
 
 @Composable
 private fun DrawerHeader() {
+    val info = remember { InfoDispositivo() }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,6 +258,12 @@ private fun DrawerHeader() {
                 text = "Gestión farmacéutica",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "${info.sistema} ${info.version}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
