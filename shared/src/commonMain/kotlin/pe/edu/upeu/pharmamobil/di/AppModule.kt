@@ -16,8 +16,12 @@ import pe.edu.upeu.pharmamobil.presentation.productos.ProductosViewModel
 
 private const val CATEGORIA_POR_DEFECTO = 1L
 
-val dataModule = module {
+val networkModule = module {
+    single(named("urlBase")) { "http://10.0.2.2:8080/api/v1/" }
     single { crearHttpClient(get(), get(named("urlBase"))) }
+}
+
+val dataModule = module {
     single { ProductoApi(get()) }
     single<ProductoRepository> {
         ProductoRepositorioRest(get(), CATEGORIA_POR_DEFECTO)
@@ -37,5 +41,5 @@ val presentationModule = module {
 
 fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
     appDeclaration()
-    modules(dataModule, domainModule, presentationModule, platformModule)
+    modules(networkModule, dataModule, domainModule, presentationModule, platformModule)
 }
