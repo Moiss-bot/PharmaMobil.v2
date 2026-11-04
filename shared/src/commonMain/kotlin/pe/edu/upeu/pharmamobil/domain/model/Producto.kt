@@ -4,22 +4,24 @@ data class Producto(
     val id: Long,
     val nombre: String,
     val precio: Double,
-    val stock: Int,
-    val activo: Boolean = true
+    val stock: Int
 ) {
+    init {
+        require(nombre.isNotBlank()) {
+            "El nombre del producto no puede estar vacio"
+        }
+        require(precio > 0 && precio.isFinite()) {
+            "El precio debe ser un numero mayor que cero"
+        }
+        require(stock >= 0) {
+            "El stock no puede ser negativo"
+        }
+    }
+
+    val requiereReposicion: Boolean
+        get() = stock < STOCK_MINIMO
+
     companion object {
-        const val STOCK_MINIMO = 5
-    }
-
-    fun tieneStock(): Boolean {
-        return stock > 0
-    }
-
-    fun esBajoStock(): Boolean {
-        return stock in 1..STOCK_MINIMO
-    }
-
-    fun requiereReposicion(): Boolean {
-        return stock <= STOCK_MINIMO
+        const val STOCK_MINIMO = 10
     }
 }

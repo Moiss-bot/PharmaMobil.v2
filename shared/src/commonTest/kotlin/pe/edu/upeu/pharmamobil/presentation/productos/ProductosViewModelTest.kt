@@ -1,4 +1,4 @@
-package pe.edu.upeu.pharmamobil.presentation.producto
+package pe.edu.upeu.pharmamobil.presentation.productos
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * setMain lo sustituye por un dispatcher de prueba antes de cada caso.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ProductoViewModelTest {
+class ProductosViewModelTest {
 
     @BeforeTest
     fun instalarMain() {
@@ -37,7 +37,7 @@ class ProductoViewModelTest {
 
     private fun nuevoViewModel(
         repositorio: FakeProductoRepository = FakeProductoRepository()
-    ) = ProductoViewModel(
+    ) = ProductosViewModel(
         registrarProducto = RegistrarProductoUseCase(repositorio),
         listarProductos = ListarProductosUseCase(repositorio)
     )

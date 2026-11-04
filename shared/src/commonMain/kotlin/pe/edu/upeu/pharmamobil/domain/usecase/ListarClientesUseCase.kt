@@ -3,6 +3,7 @@ package pe.edu.upeu.pharmamobil.domain.usecase
 import pe.edu.upeu.pharmamobil.domain.model.Cliente
 import pe.edu.upeu.pharmamobil.domain.repository.ClienteRepository
 
+
 class ListarClientesUseCase(
     private val clienteRepository: ClienteRepository
 ) {

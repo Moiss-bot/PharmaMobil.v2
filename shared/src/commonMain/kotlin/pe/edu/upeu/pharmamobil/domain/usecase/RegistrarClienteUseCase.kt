@@ -6,11 +6,13 @@ import pe.edu.upeu.pharmamobil.domain.repository.ClienteRepository
 private val CORREO_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
 private val TELEFONO_REGEX = Regex("^[0-9]{6,9}$")
 
+
 data class ErroresDeCliente(
     val nombre: String? = null,
     val correo: String? = null,
     val telefono: String? = null
 ) {
+
     val hayErrores: Boolean
         get() = nombre != null || correo != null || telefono != null
 }
@@ -19,6 +21,11 @@ class ClienteInvalidoException(
     val errores: ErroresDeCliente
 ) : IllegalArgumentException("Los datos del cliente no cumplen las reglas del negocio")
 
+/**
+ * Registra un cliente en la cartera. Concentra las reglas que antes vivian en
+ * ClienteValidator, dentro de la capa de presentacion: que correo es valido y
+ * que telefono se acepta lo decide el negocio, no la pantalla.
+ */
 class RegistrarClienteUseCase(
     private val clienteRepository: ClienteRepository
 ) {
@@ -62,6 +69,8 @@ class RegistrarClienteUseCase(
             else -> null
         }
     }
+
+    /** El telefono es opcional: solo se valida el formato si viene escrito. */
     private fun validarTelefono(telefono: String): String? {
         return if (telefono.isNotBlank() && !TELEFONO_REGEX.matches(telefono.trim())) {
             "El teléfono debe tener entre 6 y 9 dígitos"

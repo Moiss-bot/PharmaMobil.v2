@@ -11,6 +11,7 @@ import pe.edu.upeu.pharmamobil.domain.usecase.ClienteInvalidoException
 import pe.edu.upeu.pharmamobil.domain.usecase.ListarClientesUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarClienteUseCase
 
+
 class ClienteViewModel(
     private val registrarCliente: RegistrarClienteUseCase,
     private val listarClientes: ListarClientesUseCase

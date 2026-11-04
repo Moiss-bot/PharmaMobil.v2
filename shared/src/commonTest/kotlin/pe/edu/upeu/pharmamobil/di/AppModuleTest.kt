@@ -17,7 +17,7 @@ import pe.edu.upeu.pharmamobil.domain.usecase.ListarProductosUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarClienteUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.RegistrarProductoUseCase
 import pe.edu.upeu.pharmamobil.presentation.cliente.ClienteViewModel
-import pe.edu.upeu.pharmamobil.presentation.producto.ProductoViewModel
+import pe.edu.upeu.pharmamobil.presentation.productos.ProductosViewModel
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -91,7 +91,7 @@ class AppModuleTest {
 
         val koin = grafoCompleto()
 
-        koin.get<ProductoViewModel>()
+        koin.get<ProductosViewModel>()
         koin.get<ClienteViewModel>()
     }
 }
