@@ -47,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.koin.compose.KoinContext
 import org.koin.compose.viewmodel.koinViewModel
 
 import pe.edu.upeu.pharmamobil.navigation.Screen
@@ -71,7 +70,6 @@ private val DESTINOS = listOf(
     Destino(Screen.Pedidos, "Pedidos", Icons.Default.ShoppingCart)
 )
 
-
 private val ScreenSaver = Saver<Screen, Int>(
     save = { pantalla ->
         DESTINOS.indexOfFirst { it.screen == pantalla }
@@ -87,7 +85,7 @@ private val ScreenSaver = Saver<Screen, Int>(
  * (lo usa el workflow de GitHub Actions para capturar evidencias en el simulador).
  */
 @Composable
-fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
+fun App(pantallaInicial: Screen = Screen.Inicio) {
 
     var pantallaActual by rememberSaveable(stateSaver = ScreenSaver) {
         mutableStateOf<Screen>(pantallaInicial)
@@ -108,15 +106,10 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
     ) {
 
         ModalNavigationDrawer(
-
             drawerState = drawerState,
-
             drawerContent = {
-
                 ModalDrawerSheet {
-
                     DrawerHeader()
-
                     HorizontalDivider()
 
                     Spacer(
@@ -124,16 +117,13 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
                     )
 
                     DESTINOS.forEach { destino ->
-
                         NavigationDrawerItem(
                             label = {
                                 Text(destino.titulo)
                             },
                             selected = pantallaActual == destino.screen,
                             onClick = {
-
                                 pantallaActual = destino.screen
-
                                 scope.launch {
                                     drawerState.close()
                                 }
@@ -163,38 +153,28 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
                 }
             }
         ) {
-
             Scaffold(
-
                 topBar = {
-
                     TopAppBar(
-
                         title = {
                             Text(
                                 text = tituloDe(pantallaActual)
                             )
                         },
-
                         navigationIcon = {
-
                             IconButton(
                                 onClick = {
-
                                     scope.launch {
-
                                         drawerState.open()
                                     }
                                 }
                             ) {
-
                                 Icon(
                                     imageVector = Icons.Default.Menu,
                                     contentDescription = "Abrir menú"
                                 )
                             }
                         },
-
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -202,7 +182,6 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
                         )
                     )
                 }
-
             ) { paddingValues ->
 
                 Box(
@@ -210,9 +189,7 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-
                     when (pantallaActual) {
-
                         Screen.Inicio ->
                             InicioScreen(
                                 onNavegar = { destino ->
@@ -244,10 +221,8 @@ fun App(pantallaInicial: Screen = Screen.Inicio) = KoinContext {
     }
 }
 
-
 @Composable
 private fun DrawerHeader() {
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -255,13 +230,11 @@ private fun DrawerHeader() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         ) {
-
             Icon(
                 imageVector = Icons.Default.LocalPharmacy,
                 contentDescription = null,
@@ -272,7 +245,6 @@ private fun DrawerHeader() {
         }
 
         Column {
-
             Text(
                 text = "PharmaMobil",
                 style = MaterialTheme.typography.titleLarge
@@ -287,13 +259,11 @@ private fun DrawerHeader() {
     }
 }
 
-
 @Composable
 private fun ModoOscuro(
     activo: Boolean,
     onCambiar: (Boolean) -> Unit
 ) {
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,7 +274,6 @@ private fun ModoOscuro(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
         Icon(
             imageVector = Icons.Default.DarkMode,
             contentDescription = null,
@@ -323,10 +292,8 @@ private fun ModoOscuro(
     }
 }
 
-
 private fun tituloDe(
     screen: Screen
 ): String {
-
     return DESTINOS.first { it.screen == screen }.titulo
 }
