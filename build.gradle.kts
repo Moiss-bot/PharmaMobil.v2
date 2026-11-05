@@ -7,4 +7,6 @@ plugins {
     alias(libs.plugins.composeCompiler) apply false
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.kotlinSerialization) apply false
+    // <-- AGREGA ESTA LÍNEA PARA QUE SQLDELIGHT ESTÉ DISPONIBLE EN TODO EL PROYECTO
+    alias(libs.plugins.sqldelight) apply false
 }
