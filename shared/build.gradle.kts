@@ -6,9 +6,28 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
+}
+
+sqldelight {
+    databases {
+        create("PharmaDb") {
+            packageName.set("pe.edu.upeu.pharmamobil.db")
+        }
+    }
 }
 
 kotlin {
+    androidLibrary {
+        namespace = "pe.edu.upeu.pharmamobil.shared"
+        compileSdk = 36
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+        }
+    }
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -19,46 +38,25 @@ kotlin {
         }
     }
 
-    android {
-        namespace = "pe.edu.upeu.pharmamobil.shared"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
-
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
-        }
-        androidResources {
-            enable = true
-        }
-        withHostTest {
-            isIncludeAndroidResources = true
-        }
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }.configure {
-            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        }
-    }
-
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
-            // api: MainApplication (androidApp) usa androidContext() al arrancar Koin.
             api(libs.koin.android)
-            // Sesion 7: motor de red de Android
+            implementation(libs.androidx.security.crypto)
             implementation(libs.ktor.client.okhttp)
-            // OkHttp 5.5.0 (transitiva de Ktor) pide compileSdk 37; se fija 5.4.0 (ver libs.versions.toml).
             implementation("com.squareup.okhttp3:okhttp") {
                 version { strictly(libs.versions.okhttp.get()) }
             }
+            // SQLDelight Driver Android
+            implementation(libs.sqldelight.android)
         }
         iosMain.dependencies {
-            // Sesion 7: motor de red de iOS (NSURLSession)
             implementation(libs.ktor.client.darwin)
+            // SQLDelight Driver iOS
+            implementation(libs.sqldelight.native)
         }
         commonMain.dependencies {
-            // api: androidApp llama a initKoin(), cuya firma expone KoinAppDeclaration.
             api(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
@@ -71,18 +69,22 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            // Sesion 7: Ktor Client (nucleo + plugins) y kotlinx.serialization
             implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.auth)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
+            // SQLDelight Runtime + Coroutines
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            // Agrega koin-test para KoinTest y get()
-            implementation("io.insert-koin:koin-test:3.5.6")
+            implementation("io.insert-koin:koin-test:${libs.versions.koin.get()}")
             implementation(libs.ktor.client.mock)
+            // Driver SQLite JVM para tests en memoria
+            implementation(libs.sqldelight.jvm)
         }
     }
 }
@@ -91,7 +93,6 @@ dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
 
-// Configuración global para ignorar excepciones de Android Log en unit tests
 tasks.withType<Test>().configureEach {
     testLogging {
         showStandardStreams = true

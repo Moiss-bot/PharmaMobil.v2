@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalPharmacy
@@ -38,6 +39,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,14 +48,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 import pe.edu.upeu.pharmamobil.navigation.Screen
+import pe.edu.upeu.pharmamobil.platform.InfoDispositivo
 import pe.edu.upeu.pharmamobil.presentation.cliente.ClienteScreen
 import pe.edu.upeu.pharmamobil.presentation.components.EstadoVacio
 import pe.edu.upeu.pharmamobil.presentation.inicio.InicioScreen
 import pe.edu.upeu.pharmamobil.presentation.productos.ProductoScreen
+import pe.edu.upeu.pharmamobil.presentation.sesion.LoginScreen
+import pe.edu.upeu.pharmamobil.presentation.sesion.SesionViewModel
 import pe.edu.upeu.pharmamobil.theme.PharmaMobilTheme
 
 /** Una sola fuente para el menu lateral y el titulo de la barra superior. */
@@ -79,13 +85,12 @@ private val ScreenSaver = Saver<Screen, Int>(
     }
 )
 
-/**
- * @param pantallaInicial pantalla con la que abre la app. Por defecto Inicio;
- * iOS la puede cambiar con el argumento de arranque `-pantalla productos`
- * (lo usa el workflow de GitHub Actions para capturar evidencias en el simulador).
- */
 @Composable
-fun App(pantallaInicial: Screen = Screen.Inicio) {
+fun App(
+    pantallaInicial: Screen = Screen.Inicio,
+    sesionViewModel: SesionViewModel = koinViewModel()
+) {
+    val sesionState by sesionViewModel.estado.collectAsStateWithLifecycle()
 
     var pantallaActual by rememberSaveable(stateSaver = ScreenSaver) {
         mutableStateOf<Screen>(pantallaInicial)
@@ -104,116 +109,155 @@ fun App(pantallaInicial: Screen = Screen.Inicio) {
     PharmaMobilTheme(
         darkTheme = darkTheme
     ) {
+        // Evaluacion de autenticacion: si no hay sesion activa, mostramos la pantalla de Login
+        if (sesionState.sesion == null) {
+            LoginScreen(
+                viewModel = sesionViewModel,
+                onLoginExitoso = {
+                    pantallaActual = Screen.Inicio
+                }
+            )
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet {
+                        DrawerHeader(
+                            usuarioNombre = sesionState.sesion?.nombreCompleto ?: "Usuario"
+                        )
+                        HorizontalDivider()
 
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet {
-                    DrawerHeader()
-                    HorizontalDivider()
+                        Spacer(
+                            modifier = Modifier.height(12.dp)
+                        )
 
-                    Spacer(
-                        modifier = Modifier.height(12.dp)
-                    )
+                        DESTINOS.forEach { destino ->
+                            // Filtrar en el menu lateral segun permisos del rol[cite: 24]
+                            val tienePermiso = when (destino.screen) {
+                                Screen.Clientes -> sesionState.sesion?.puede("CLIENTES_LEER") == true
+                                else -> true
+                            }
 
-                    DESTINOS.forEach { destino ->
+                            if (tienePermiso) {
+                                NavigationDrawerItem(
+                                    label = {
+                                        Text(destino.titulo)
+                                    },
+                                    selected = pantallaActual == destino.screen,
+                                    onClick = {
+                                        pantallaActual = destino.screen
+                                        scope.launch {
+                                            drawerState.close()
+                                        }
+                                    },
+                                    icon = {
+                                        Icon(
+                                            imageVector = destino.icono,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier.padding(
+                                        NavigationDrawerItemDefaults.ItemPadding
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        HorizontalDivider()
+
+                        ModoOscuro(
+                            activo = darkTheme,
+                            onCambiar = { darkTheme = it }
+                        )
+
+                        // Opcion de Cerrar Sesion
                         NavigationDrawerItem(
-                            label = {
-                                Text(destino.titulo)
-                            },
-                            selected = pantallaActual == destino.screen,
+                            label = { Text("Cerrar sesión") },
+                            selected = false,
                             onClick = {
-                                pantallaActual = destino.screen
-                                scope.launch {
-                                    drawerState.close()
-                                }
+                                scope.launch { drawerState.close() }
+                                sesionViewModel.cerrarSesion()
                             },
                             icon = {
                                 Icon(
-                                    imageVector = destino.icono,
-                                    contentDescription = null
+                                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = "Cerrar sesión"
                                 )
                             },
                             modifier = Modifier.padding(
                                 NavigationDrawerItemDefaults.ItemPadding
                             )
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
-
-                    Spacer(
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    HorizontalDivider()
-
-                    ModoOscuro(
-                        activo = darkTheme,
-                        onCambiar = { darkTheme = it }
-                    )
                 }
-            }
-        ) {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = tituloDe(pantallaActual)
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        drawerState.open()
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "Abrir menú"
+            ) {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = tituloDe(pantallaActual)
                                 )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    )
-                }
-            ) { paddingValues ->
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    when (pantallaActual) {
-                        Screen.Inicio ->
-                            InicioScreen(
-                                onNavegar = { destino ->
-                                    pantallaActual = destino
+                            },
+                            navigationIcon = {
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            drawerState.open()
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Abrir menú"
+                                    )
                                 }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
+                        )
+                    }
+                ) { paddingValues ->
 
-                        Screen.Productos ->
-                            ProductoScreen(
-                                viewModel = koinViewModel()
-                            )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        when (pantallaActual) {
+                            Screen.Inicio ->
+                                InicioScreen(
+                                    onNavegar = { destino ->
+                                        pantallaActual = destino
+                                    }
+                                )
 
-                        Screen.Clientes ->
-                            ClienteScreen(
-                                viewModel = koinViewModel()
-                            )
+                            Screen.Productos ->
+                                ProductoScreen(
+                                    viewModel = koinViewModel()
+                                )
 
-                        Screen.Pedidos ->
-                            EstadoVacio(
-                                icono = Icons.Default.ShoppingCart,
-                                titulo = "Pedidos en construcción",
-                                descripcion = "Este módulo llega en una próxima sesión del curso.",
-                                modifier = Modifier.align(Alignment.Center)
-                            )
+                            Screen.Clientes ->
+                                ClienteScreen(
+                                    viewModel = koinViewModel()
+                                )
+
+                            Screen.Pedidos ->
+                                EstadoVacio(
+                                    icono = Icons.Default.ShoppingCart,
+                                    titulo = "Pedidos en construcción",
+                                    descripcion = "Este módulo llega en una próxima sesión del curso.",
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                        }
                     }
                 }
             }
@@ -222,7 +266,9 @@ fun App(pantallaInicial: Screen = Screen.Inicio) {
 }
 
 @Composable
-private fun DrawerHeader() {
+private fun DrawerHeader(usuarioNombre: String) {
+    val info = remember { InfoDispositivo() }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -251,9 +297,15 @@ private fun DrawerHeader() {
             )
 
             Text(
-                text = "Gestión farmacéutica",
+                text = usuarioNombre,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "${info.sistema} ${info.version}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
