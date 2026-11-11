@@ -155,14 +155,15 @@ val presentationModule = module {
         SesionViewModel(get())
     }
 
-    // Productos
+    // Productos con sincronización automática por internet
     factory {
         ProductosViewModel(
-            get(),
-            get(),
-            get(),
-            get(),
-            get()
+            listarProductosUseCase = get(),
+            registrarProductoUseCase = get(),
+            actualizarProductoUseCase = get(),
+            eliminarProductoUseCase = get(),
+            sincronizarProductosUseCase = get(),
+            networkMonitor = get()
         )
     }
 

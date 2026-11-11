@@ -4,15 +4,18 @@ data class Producto(
     val id: Long,
     val nombre: String,
     val precio: Double,
-    val stock: Int
+    val stock: Int,
+    val estado: Boolean = true
 ) {
     init {
         require(nombre.isNotBlank()) {
-            "El nombre del producto no puede estar vacio"
+            "El nombre del producto no puede estar vacío"
         }
+
         require(precio > 0 && precio.isFinite()) {
-            "El precio debe ser un numero mayor que cero"
+            "El precio debe ser un número mayor que cero"
         }
+
         require(stock >= 0) {
             "El stock no puede ser negativo"
         }

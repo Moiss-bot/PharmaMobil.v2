@@ -8,13 +8,16 @@ fun ProductoResponseDto.toDomain(): Producto = Producto(
     id = id,
     nombre = nombre,
     precio = precio,
-    stock = stock
+    stock = stock,
+    estado = estado
 )
 
-fun Producto.toRequest(categoriaId: Long): ProductoRequestDto = ProductoRequestDto(
-    nombre = nombre,
-    precio = precio,
-    stock = stock,
-    estado = true,
-    categoriaId = categoriaId
-)
+// Convierte el modelo de dominio al DTO de solicitud
+fun Producto.toRequest(categoriaId: Long): ProductoRequestDto =
+    ProductoRequestDto(
+        nombre = nombre,
+        precio = precio,
+        stock = stock,
+        estado = estado,
+        categoriaId = categoriaId
+    )

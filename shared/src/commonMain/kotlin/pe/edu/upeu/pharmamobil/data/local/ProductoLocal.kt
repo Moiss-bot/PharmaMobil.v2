@@ -1,4 +1,6 @@
+
 package pe.edu.upeu.pharmamobil.data.local
+
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import kotlinx.coroutines.Dispatchers
@@ -7,15 +9,12 @@ import kotlinx.coroutines.flow.map
 import pe.edu.upeu.pharmamobil.db.PharmaDb
 import pe.edu.upeu.pharmamobil.domain.model.Producto
 
-class ProductoLocal(
-    base: PharmaDb
-) {
+class ProductoLocal(base: PharmaDb) {
 
     private val consultas = base.productoQueries
 
-    // Observar todos los productos locales
-    fun observar(): Flow<List<Producto>> =
-        consultas.listarTodos()
+    fun observar(): Flow<List<Producto>> {
+        return consultas.listarTodos()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { filas ->
@@ -24,107 +23,116 @@ class ProductoLocal(
                         id = fila.id,
                         nombre = fila.nombre,
                         precio = fila.precio,
-                        stock = fila.stock.toInt()
+                        stock = fila.stock.toInt(),
+                        estado = fila.estado == 1L
                     )
                 }
             }
+    }
 
-    // Obtener productos pendientes de sincronización
-    fun pendientesPorEnviar(maxIntentos: Long): List<Producto> =
-        consultas.pendientesPorEnviar(maxIntentos)
+    fun pendientesPorEnviar(maxIntentos: Long): List<Producto> {
+        return consultas.pendientesPorEnviar(maxIntentos)
             .executeAsList()
             .map { fila ->
                 Producto(
                     id = fila.id,
                     nombre = fila.nombre,
                     precio = fila.precio,
-                    stock = fila.stock.toInt()
+                    stock = fila.stock.toInt(),
+                    estado = fila.estado == 1L
                 )
             }
+    }
 
-    // Contar productos pendientes
-    fun contarPendientes(maxIntentos: Long): Long =
-        consultas.contarPendientes(maxIntentos)
-            .executeAsOne()
+    fun contarPendientes(maxIntentos: Long): Long {
+        return consultas.contarPendientes(maxIntentos).executeAsOne()
+    }
 
-    // Contar productos con sincronización fallida
-    fun contarFallidas(maxIntentos: Long): Long =
-        consultas.contarFallidas(maxIntentos)
-            .executeAsOne()
+    fun contarFallidas(maxIntentos: Long): Long {
+        return consultas.contarFallidas(maxIntentos).executeAsOne()
+    }
 
-    // Guardar un producto nuevo como pendiente
     fun guardarPendiente(producto: Producto): Producto {
-        val menor = consultas.siguienteIdLocal()
-            .executeAsOne()
-
+        val menor = consultas.siguienteIdLocal().executeAsOne()
         val localId = minOf(menor, 0L) - 1L
 
-        val local = producto.copy(id = localId)
+        val productoLocal = producto.copy(
+            id = localId,
+            estado = true
+        )
 
         consultas.insertar(
-            id = local.id,
-            nombre = local.nombre,
-            precio = local.precio,
-            stock = local.stock.toLong(),
+            id = productoLocal.id,
+            nombre = productoLocal.nombre,
+            precio = productoLocal.precio,
+            stock = productoLocal.stock.toLong(),
+            estado = if (productoLocal.estado) 1L else 0L,
             pendiente = 1L,
             intentos = 0L,
             ultimoError = null
         )
 
-        return local
+        return productoLocal
     }
 
-    // Actualizar un producto local y marcarlo como pendiente
     fun actualizarLocal(producto: Producto) {
         consultas.actualizar(
             nombre = producto.nombre,
             precio = producto.precio,
             stock = producto.stock.toLong(),
+            estado = if (producto.estado) 1L else 0L,
             id = producto.id
         )
     }
 
-    // Registrar un intento fallido de sincronización
+    fun desactivarLocal(id: Long) {
+        consultas.desactivarProducto(id)
+    }
+
+    fun activarLocal(id: Long) {
+        consultas.activarProducto(id)
+    }
+
     fun sumarIntento(id: Long, motivo: String) {
         consultas.sumarIntento(
-            motivo = motivo,
-            id = id
+            id = id,
+            motivo = motivo
         )
     }
 
-    // Marcar un producto como fallido permanentemente
     fun marcarFallida(id: Long, motivo: String) {
         consultas.marcarFallida(
-            motivo = motivo,
-            id = id
+            id = id,
+            motivo = motivo
         )
     }
 
-    // Confirmar que el producto fue sincronizado con el servidor
     fun confirmarSincronizacion(
         idLocal: Long,
         idServidor: Long
     ) {
         consultas.transaction {
+
             if (idLocal != idServidor) {
                 consultas.eliminarPorId(idServidor)
             }
 
-            consultas.actualizarIdSincronizado(
+            consultas.confirmarSincronizacion(
                 idLocal = idLocal,
                 idServidor = idServidor
             )
         }
     }
 
-    // Eliminar un producto local
     fun eliminarLocal(id: Long) {
         consultas.eliminarPorId(id)
     }
 
-    // Reemplazar los productos sincronizados por los recibidos del servidor
     fun reemplazarSincronizados(productos: List<Producto>) {
         consultas.transaction {
+
+            // Se eliminan únicamente productos sincronizados.
+            // Los pendientes deben permanecer en la base local.
             consultas.borrarSincronizados()
 
             productos.forEach { producto ->
@@ -133,6 +141,7 @@ class ProductoLocal(
                     nombre = producto.nombre,
                     precio = producto.precio,
                     stock = producto.stock.toLong(),
+                    estado = if (producto.estado) 1L else 0L,
                     pendiente = 0L,
                     intentos = 0L,
                     ultimoError = null

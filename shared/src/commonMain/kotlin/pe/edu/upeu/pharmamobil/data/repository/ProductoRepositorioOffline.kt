@@ -1,6 +1,7 @@
 
 package pe.edu.upeu.pharmamobil.data.repository
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import pe.edu.upeu.pharmamobil.data.local.ProductoLocal
 import pe.edu.upeu.pharmamobil.data.remote.ProductoApi
@@ -21,9 +22,7 @@ class ProductoRepositorioOffline(
     override suspend fun registrar(producto: Producto): Producto {
         val guardado = local.guardarPendiente(producto)
 
-        intentar {
-            sincronizar()
-        }
+        sincronizarConRegistroDeErrores()
 
         return guardado
     }
@@ -35,82 +34,143 @@ class ProductoRepositorioOffline(
             local.guardarPendiente(producto)
         }
 
-        intentar {
-            sincronizar()
-        }
+        sincronizarConRegistroDeErrores()
 
         return producto
     }
 
     override suspend fun eliminar(id: Long) {
-        local.eliminarLocal(id)
+        local.desactivarLocal(id)
 
-        if (id > 0) {
-            intentar {
+        if (id > 0L) {
+            try {
                 remoto.eliminar(id)
+
+                println(
+                    "✅ PharmMobile: Producto $id desactivado en el servidor."
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                println(
+                    "❌ PharmMobile: Error al desactivar producto $id: ${e.message}"
+                )
             }
         }
     }
 
     override suspend fun sincronizar() {
-        subirPendientes()
+        println("🔄 PharmMobile: Iniciando sincronización...")
 
-        val remotosDto = remoto.listar().contenido
+        // Enviar productos locales pendientes
+        val erroresEnvio = subirPendientes()
 
-        local.reemplazarSincronizados(
-            remotosDto.map { it.toDomain() }
+        // Descargar productos desde el servidor
+        val respuestaRemota = remoto.listar()
+
+        val productosRemotos = respuestaRemota.contenido.map {
+            it.toDomain()
+        }
+
+        // Actualizar productos sincronizados localmente
+        local.reemplazarSincronizados(productosRemotos)
+
+        println(
+            "📥 PharmMobile: Descarga de ${productosRemotos.size} productos completada."
         )
+
+        // Si algún producto no se envió, informar el error al ViewModel
+        if (erroresEnvio.isNotEmpty()) {
+            val detalle = erroresEnvio.joinToString(separator = "; ")
+
+            throw IllegalStateException(
+                "Sincronización incompleta. Productos pendientes: $detalle"
+            )
+        }
+
+        println("✅ PharmMobile: Sincronización completada correctamente.")
     }
 
-    private suspend fun subirPendientes() {
+    private suspend fun subirPendientes(): List<String> {
         val pendientes = local.pendientesPorEnviar(5L)
+
+        val errores = mutableListOf<String>()
+
+        println(
+            "📦 PharmMobile: Productos pendientes encontrados: ${pendientes.size}"
+        )
 
         pendientes.forEach { pendiente ->
 
             try {
-                val request = pendiente.toRequest(
-                    categoriaPorDefecto
-                )
+                val request = pendiente.toRequest(categoriaPorDefecto)
 
-                val respuesta = if (pendiente.id < 0) {
+                val respuesta = if (pendiente.id < 0L) {
 
-                    // Crear producto en el backend
+                    println(
+                        "⬆️ PharmMobile: Creando producto ${pendiente.nombre}..."
+                    )
+
                     remoto.crear(request)
 
                 } else {
 
-                    // Actualizar producto existente
-                    remoto.actualizar(
-                        pendiente.id,
-                        request
+                    println(
+                        "⬆️ PharmMobile: Actualizando producto ${pendiente.nombre}, ID ${pendiente.id}..."
                     )
+
+                    remoto.actualizar(pendiente.id, request)
                 }
 
-                // Confirmar sincronización local
+                // Marcar como sincronizado únicamente tras respuesta exitosa
                 local.confirmarSincronizacion(
                     idLocal = pendiente.id,
                     idServidor = respuesta.id
                 )
 
+                println(
+                    "✅ PharmMobile: Producto ${pendiente.nombre} sincronizado. " +
+                            "ID local: ${pendiente.id}, ID servidor: ${respuesta.id}"
+                )
+
+            } catch (e: CancellationException) {
+                throw e
+
             } catch (e: Exception) {
 
-                // Registrar el intento fallido
+                val mensaje = e.message ?: "Error desconocido al sincronizar"
+
+                errores.add("${pendiente.nombre}: $mensaje")
+
                 local.sumarIntento(
                     id = pendiente.id,
-                    motivo = e.message
-                        ?: "Error al sincronizar producto"
+                    motivo = mensaje
                 )
+
+                println(
+                    "❌ PharmMobile: Falló el envío de ${pendiente.nombre}. " +
+                            "ID: ${pendiente.id}. Error: $mensaje"
+                )
+
+                e.printStackTrace()
             }
         }
+
+        return errores
     }
 
-    private suspend fun intentar(bloque: suspend () -> Unit) {
+    private suspend fun sincronizarConRegistroDeErrores() {
         try {
-            println("🔄 PharmMobile: Iniciando sincronización...")
-            bloque()
-            println("✅ PharmMobile: Sincronización ejecutada.")
+            sincronizar()
+
+        } catch (e: CancellationException) {
+            throw e
+
         } catch (e: Exception) {
-            println("❌ PharmMobile: Error al sincronizar: ${e.message}")
+            println(
+                "❌ PharmMobile: Error al sincronizar: ${e.message}"
+            )
+
             e.printStackTrace()
         }
     }

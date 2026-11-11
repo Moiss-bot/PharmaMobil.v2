@@ -10,8 +10,10 @@ data class ProductoRequestDto(
     val nombre: String,
     val precio: Double,
     val stock: Int,
-    @EncodeDefault val estado: Boolean = true,
-    @EncodeDefault val categoriaId: Long = 1L
+    @EncodeDefault
+    val estado: Boolean = true,
+    @EncodeDefault
+    val categoriaId: Long = 1L
 )
 
 @Serializable
