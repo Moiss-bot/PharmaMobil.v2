@@ -1,3 +1,4 @@
+
 package pe.edu.upeu.pharmamobil.presentation.productos
 
 import androidx.lifecycle.ViewModel
@@ -9,6 +10,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
 import pe.edu.upeu.pharmamobil.domain.model.Producto
 import pe.edu.upeu.pharmamobil.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobil.domain.usecase.EliminarProductoUseCase
@@ -28,18 +32,31 @@ class ProductosViewModel(
     private val _sincronizando = MutableStateFlow(false)
     private val _avisoRed = MutableStateFlow<String?>(null)
 
+    // Evita sincronizaciones simultáneas
+    private val mutexSincronizacion = Mutex()
+
+    init {
+        // Intenta sincronizar al iniciar el ViewModel
+        sincronizar()
+    }
+
     val uiState: StateFlow<ProductosUiState> = combine(
         listarProductosUseCase(),
         _formulario,
         _sincronizando,
         _avisoRed
-    ) { productos: List<Producto>, form: FormularioState, sync: Boolean, aviso: String? ->
+    ) { productos: List<Producto>,
+        form: FormularioState,
+        sync: Boolean,
+        aviso: String? ->
+
         val fase = if (productos.isEmpty()) {
             ProductosUiState.Fase.SinProductos
         } else {
             ProductosUiState.Fase.ConProductos(productos)
         }
 
+        // Cuenta productos nuevos con ID local negativo
         val pendientesCount = productos.count { it.id < 0 }.toLong()
 
         ProductosUiState(
@@ -58,15 +75,21 @@ class ProductosViewModel(
     )
 
     fun onNombreChange(valor: String) {
-        _formulario.update { it.copy(nombre = valor) }
+        _formulario.update {
+            it.copy(nombre = valor)
+        }
     }
 
     fun onPrecioChange(valor: String) {
-        _formulario.update { it.copy(precio = valor) }
+        _formulario.update {
+            it.copy(precio = valor)
+        }
     }
 
     fun onStockChange(valor: String) {
-        _formulario.update { it.copy(stock = valor) }
+        _formulario.update {
+            it.copy(stock = valor)
+        }
     }
 
     fun seleccionarParaEditar(producto: Producto) {
@@ -82,46 +105,102 @@ class ProductosViewModel(
 
     fun guardar() {
         val currentForm = _formulario.value
-        val nombre = currentForm.nombre.trim()
-        val precio = currentForm.precio.toDoubleOrNull() ?: 0.0
-        val stock = currentForm.stock.toIntOrNull() ?: 0
 
-        if (nombre.isBlank()) return
+        val nombre = currentForm.nombre.trim()
+        val precio = currentForm.precio.toDoubleOrNull()
+        val stock = currentForm.stock.toIntOrNull()
+
+        // Validación de datos
+        if (nombre.isBlank()) {
+            _avisoRed.value = "Ingrese el nombre del producto"
+            return
+        }
+
+        if (precio == null || precio < 0) {
+            _avisoRed.value = "Ingrese un precio válido"
+            return
+        }
+
+        if (stock == null || stock < 0) {
+            _avisoRed.value = "Ingrese un stock válido"
+            return
+        }
+
+        if (currentForm.guardando) return
 
         viewModelScope.launch {
-            _formulario.update { it.copy(guardando = true) }
-            val producto = Producto(
-                id = currentForm.id ?: 0L,
-                nombre = nombre,
-                precio = precio,
-                stock = stock
-            )
-
-            if (currentForm.id == null || currentForm.id == 0L) {
-                registrarProductoUseCase(producto)
-            } else {
-                actualizarProductoUseCase(producto)
+            _formulario.update {
+                it.copy(guardando = true)
             }
 
-            _formulario.update { FormularioState() }
+            _avisoRed.value = null
+
+            try {
+                val producto = Producto(
+                    id = currentForm.id ?: 0L,
+                    nombre = nombre,
+                    precio = precio,
+                    stock = stock
+                )
+
+                if (currentForm.id == null || currentForm.id == 0L) {
+                    registrarProductoUseCase(producto)
+                } else {
+                    actualizarProductoUseCase(producto)
+                }
+
+                // Limpia el formulario luego de guardar
+                _formulario.update {
+                    FormularioState()
+                }
+
+            } catch (e: Exception) {
+                _avisoRed.value =
+                    "Error al guardar producto: ${e.message}"
+
+            } finally {
+                _formulario.update {
+                    it.copy(guardando = false)
+                }
+            }
         }
     }
 
     fun eliminar(id: Long) {
         viewModelScope.launch {
-            eliminarProductoUseCase(id)
+            try {
+                eliminarProductoUseCase(id)
+                _avisoRed.value = null
+            } catch (e: Exception) {
+                _avisoRed.value =
+                    "Error al eliminar producto: ${e.message}"
+            }
         }
     }
 
     fun sincronizar() {
         viewModelScope.launch {
-            _sincronizando.value = true
-            try {
-                sincronizarProductosUseCase()
-            } catch (e: Exception) {
-                _avisoRed.value = "Error al sincronizar: ${e.message}"
-            } finally {
-                _sincronizando.value = false
+            mutexSincronizacion.withLock {
+                _sincronizando.value = true
+                _avisoRed.value = null
+
+                try {
+                    println("🔄 PharmMobile: iniciando sincronización")
+
+                    sincronizarProductosUseCase()
+
+                    println("✅ PharmMobile: sincronización ejecutada")
+
+                } catch (e: Exception) {
+                    println("❌ PharmMobile: error de sincronización")
+                    println(e.message)
+
+                    _avisoRed.value =
+                        "Error al sincronizar: ${e.message}"
+
+                } finally {
+                    _sincronizando.value = false
+                }
             }
         }
     }

@@ -1,3 +1,4 @@
+
 package pe.edu.upeu.pharmamobil.domain.usecase
 
 import kotlinx.coroutines.delay
@@ -14,6 +15,7 @@ class SincronizarProductosUseCase(
     private val remoto: ProductoApi,
     private val categoriaPorDefecto: Long = 1L
 ) {
+
     suspend operator fun invoke(): ResumenSync {
         var enviadas = 0
         var fallidas = 0
@@ -21,45 +23,82 @@ class SincronizarProductosUseCase(
         val pendientes = local.pendientesPorEnviar(MAX_INTENTOS)
 
         for (fila in pendientes) {
+
             val resultado = try {
                 if (fila.id < 0) {
-                    val respuesta = remoto.crear(fila.toRequest(categoriaPorDefecto))
+                    val respuesta = remoto.crear(
+                        fila.toRequest(categoriaPorDefecto)
+                    )
+
                     ResultadoEnvio.Exito(respuesta.id)
+
                 } else {
-                    val respuesta = remoto.actualizar(fila.id, fila.toRequest(categoriaPorDefecto))
+                    val respuesta = remoto.actualizar(
+                        fila.id,
+                        fila.toRequest(categoriaPorDefecto)
+                    )
+
                     ResultadoEnvio.Exito(respuesta.id)
                 }
+
             } catch (e: Exception) {
                 e.aResultadoEnvio()
             }
 
             when (resultado) {
+
                 is ResultadoEnvio.Exito -> {
-                    local.confirmarSincronizacion(fila.id, resultado.idServidor)
+                    local.confirmarSincronizacion(
+                        idLocal = fila.id,
+                        idServidor = resultado.idServidor
+                    )
+
                     enviadas++
                 }
+
                 is ResultadoEnvio.Permanente -> {
-                    local.marcarFallida(fila.id, resultado.motivo)
+                    local.marcarFallida(
+                        id = fila.id,
+                        motivo = resultado.motivo
+                    )
+
                     fallidas++
                 }
+
                 is ResultadoEnvio.Transitorio -> {
-                    local.sumarIntento(fila.id, resultado.motivo)
-                    delay(calcularEspera(1)) // Retardo básico
+                    local.sumarIntento(
+                        id = fila.id,
+                        motivo = resultado.motivo
+                    )
+
+                    delay(calcularEspera(1))
                 }
             }
         }
 
+        // Actualizar los productos sincronizados desde el servidor
         try {
             val remotosDto = remoto.listar().contenido
-            local.reemplazarSincronizados(remotosDto.map { it.toDomain() })
-        } catch (_: Exception) {
+
+            local.reemplazarSincronizados(
+                remotosDto.map { it.toDomain() }
+            )
+
+        } catch (e: Exception) {
+            println(
+                "PharmMobile: error al actualizar productos locales: ${e.message}"
+            )
         }
 
-        return ResumenSync(enviadas, fallidas, local.contarPendientes(MAX_INTENTOS))
+        return ResumenSync(
+            enviadas,
+            fallidas,
+            local.contarPendientes(MAX_INTENTOS)
+        )
     }
 
     private fun calcularEspera(intentos: Int): Long {
-        return (1000L shl intentos.coerceAtMost(4))
+        return 1000L shl intentos.coerceAtMost(4)
     }
 
     companion object {

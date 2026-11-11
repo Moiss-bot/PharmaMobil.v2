@@ -1,3 +1,4 @@
+
 package pe.edu.upeu.pharmamobil.data.repository
 
 import kotlinx.coroutines.flow.Flow
@@ -14,11 +15,16 @@ class ProductoRepositorioOffline(
     private val categoriaPorDefecto: Long = 1L
 ) : ProductoRepository {
 
-    override fun observar(): Flow<List<Producto>> = local.observar()
+    override fun observar(): Flow<List<Producto>> =
+        local.observar()
 
     override suspend fun registrar(producto: Producto): Producto {
         val guardado = local.guardarPendiente(producto)
-        intentar { sincronizar() }
+
+        intentar {
+            sincronizar()
+        }
+
         return guardado
     }
 
@@ -28,12 +34,17 @@ class ProductoRepositorioOffline(
         } else {
             local.guardarPendiente(producto)
         }
-        intentar { sincronizar() }
+
+        intentar {
+            sincronizar()
+        }
+
         return producto
     }
 
     override suspend fun eliminar(id: Long) {
         local.eliminarLocal(id)
+
         if (id > 0) {
             intentar {
                 remoto.eliminar(id)
@@ -43,26 +54,64 @@ class ProductoRepositorioOffline(
 
     override suspend fun sincronizar() {
         subirPendientes()
+
         val remotosDto = remoto.listar().contenido
-        local.reemplazarSincronizados(remotosDto.map { it.toDomain() })
+
+        local.reemplazarSincronizados(
+            remotosDto.map { it.toDomain() }
+        )
     }
 
     private suspend fun subirPendientes() {
-        // Usa pendientesPorEnviar con el máximo de intentos permitido (5L)
-        local.pendientesPorEnviar(5L).forEach { pendiente ->
-            if (pendiente.id < 0) {
-                remoto.crear(pendiente.toRequest(categoriaPorDefecto))
-            } else {
-                remoto.actualizar(pendiente.id, pendiente.toRequest(categoriaPorDefecto))
+        val pendientes = local.pendientesPorEnviar(5L)
+
+        pendientes.forEach { pendiente ->
+
+            try {
+                val request = pendiente.toRequest(
+                    categoriaPorDefecto
+                )
+
+                val respuesta = if (pendiente.id < 0) {
+
+                    // Crear producto en el backend
+                    remoto.crear(request)
+
+                } else {
+
+                    // Actualizar producto existente
+                    remoto.actualizar(
+                        pendiente.id,
+                        request
+                    )
+                }
+
+                // Confirmar sincronización local
+                local.confirmarSincronizacion(
+                    idLocal = pendiente.id,
+                    idServidor = respuesta.id
+                )
+
+            } catch (e: Exception) {
+
+                // Registrar el intento fallido
+                local.sumarIntento(
+                    id = pendiente.id,
+                    motivo = e.message
+                        ?: "Error al sincronizar producto"
+                )
             }
         }
     }
 
     private suspend fun intentar(bloque: suspend () -> Unit) {
         try {
+            println("🔄 PharmMobile: Iniciando sincronización...")
             bloque()
-        } catch (_: Exception) {
-            // Cambio preservado localmente en SQLite
+            println("✅ PharmMobile: Sincronización ejecutada.")
+        } catch (e: Exception) {
+            println("❌ PharmMobile: Error al sincronizar: ${e.message}")
+            e.printStackTrace()
         }
     }
 }

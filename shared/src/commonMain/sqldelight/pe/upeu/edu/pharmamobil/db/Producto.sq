@@ -1,3 +1,4 @@
+
 CREATE TABLE producto (
     id INTEGER NOT NULL PRIMARY KEY,
     nombre TEXT NOT NULL,
@@ -9,16 +10,24 @@ CREATE TABLE producto (
 );
 
 listarTodos:
-SELECT * FROM producto ORDER BY nombre ASC;
+SELECT * FROM producto
+ORDER BY nombre ASC;
 
 pendientesPorEnviar:
-SELECT * FROM producto WHERE pendiente = 1 AND intentos < :maxIntentos ORDER BY id ASC;
+SELECT * FROM producto
+WHERE pendiente = 1
+AND intentos < :maxIntentos
+ORDER BY id ASC;
 
 contarPendientes:
-SELECT COUNT(*) FROM producto WHERE pendiente = 1 AND intentos < :maxIntentos;
+SELECT COUNT(*) FROM producto
+WHERE pendiente = 1
+AND intentos < :maxIntentos;
 
 contarFallidas:
-SELECT COUNT(*) FROM producto WHERE pendiente = 1 AND intentos >= :maxIntentos;
+SELECT COUNT(*) FROM producto
+WHERE pendiente = 1
+AND intentos >= :maxIntentos;
 
 insertar:
 INSERT OR REPLACE INTO producto
@@ -26,24 +35,49 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 
 actualizar:
 UPDATE producto
-SET nombre = :nombre, precio = :precio, stock = :stock, pendiente = 1
+SET nombre = :nombre,
+    precio = :precio,
+    stock = :stock,
+    pendiente = 1
 WHERE id = :id;
 
 sumarIntento:
 UPDATE producto
-SET intentos = intentos + 1, ultimoError = :motivo
+SET intentos = intentos + 1,
+    ultimoError = :motivo
 WHERE id = :id;
 
 marcarFallida:
 UPDATE producto
-SET intentos = 99, ultimoError = :motivo
+SET intentos = 99,
+    ultimoError = :motivo
 WHERE id = :id;
 
 eliminarPorId:
-DELETE FROM producto WHERE id = :id;
+DELETE FROM producto
+WHERE id = :id;
 
 borrarSincronizados:
-DELETE FROM producto WHERE pendiente = 0;
+DELETE FROM producto
+WHERE pendiente = 0;
 
 siguienteIdLocal:
-SELECT COALESCE(MIN(id), 0) FROM producto;
+SELECT COALESCE(MIN(id), 0)
+FROM producto;
+
+confirmarSincronizacion:
+UPDATE producto
+SET id = :idServidor,
+    pendiente = 0,
+    intentos = 0,
+    ultimoError = NULL
+WHERE id = :idLocal;
+
+
+actualizarIdSincronizado:
+UPDATE producto
+SET id = :idServidor,
+    pendiente = 0,
+    intentos = 0,
+    ultimoError = NULL
+WHERE id = :idLocal;
